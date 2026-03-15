@@ -15,7 +15,12 @@ import net.wifi
 import http
 import dns_simple_server as dns
 
+import encoding.json
+import system.assets
+
 import .mode as mode
+
+ASSETS ::= assets.decode
 
 CAPTIVE_PORTAL_SSID     ::= "mywifi"
 CAPTIVE_PORTAL_PASSWORD ::= "12345678"
@@ -25,11 +30,11 @@ TEMPORARY_REDIRECTS ::= {
   "gen_204": "/",         // Used by Android captive portal detection.
 }
 
-INDEX ::= """
+DEFAULT_INDEX ::= """
 <html>
   <head>
     <title>WiFi settings</title>
-  </head>
+{{css-link}}  </head>
   <body>
     <h1>Update WiFi settings</h1>
     <form>
@@ -115,8 +120,8 @@ run_dns network/net.Interface -> none:
   finally:
     socket.close
 
-run_http network/net.Interface access_points/List -> Map:
-  socket := network.tcp_listen 80
+run_http network/net.Interface access_points/List --port/int=80 -> Map:
+  socket := network.tcp_listen port
   server := http.Server
   result/Map? := null
   try:
@@ -140,19 +145,46 @@ handle_http_request request/http.Request writer/http.ResponseWriter access_point
     writer.write_headers 302
     return null
 
-  if resource != "index.html":
+  if resource == "access-points.json":
+    writer.headers.set "Content-Type" "application/json"
+    writer.write (json.encode (access_points.map: { "ssid": it.ssid, "rssi": it.rssi }))
+    return null
+
+  asset := ASSETS.get resource
+  if asset:
+    if resource.ends_with ".html":
+      writer.headers.set "Content-Type" "text/html"
+    else if resource.ends_with ".css":
+      writer.headers.set "Content-Type" "text/css"
+    else if resource.ends_with ".js":
+      writer.headers.set "Content-Type" "application/javascript"
+    else:
+      writer.headers.set "Content-Type" "application/octet-stream"
+
+    if resource == "index.html":
+      substitutions := {
+        "access-points": (access_points.map: "$it.ssid<br>").join "\n"
+      }
+      str := asset.to_string
+      writer.write (str.substitute: substitutions.get it --if_absent=(: "{{$it}}"))
+    else:
+      writer.write asset
+  else if resource != "index.html":
     writer.headers.set "Content-Type" "text/plain"
     writer.write_headers 404
     writer.write "Not found: $resource"
     return null
-
-  substitutions := {
-    "access-points": (access_points.map: "$it.ssid<br>").join "\n"
-  }
-  writer.headers.set "Content-Type" "text/html"
-  writer.write (INDEX.substitute: substitutions[it])
+  else:
+    substitutions := {
+      "access-points": (access_points.map: "$it.ssid<br>").join "\n",
+      "css-link": (ASSETS.contains "style.css") ? "<link rel=\"stylesheet\" href=\"style.css\">\n" : "",
+    }
+    writer.headers.set "Content-Type" "text/html"
+    writer.write (DEFAULT_INDEX.substitute: substitutions.get it --if_absent=(: "{{$it}}"))
 
   if query.parameters.is_empty: return null
-  ssid := query.parameters["ssid"].trim
-  password := query.parameters["password"].trim
-  return { "ssid": ssid, "password": password }
+  ssid := query.parameters.get "ssid"
+  password := query.parameters.get "password"
+  if ssid and password:
+    return { "ssid": ssid.trim, "password": password.trim }
+  return null
