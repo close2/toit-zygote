@@ -1,10 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
     const list = document.getElementById("network-list");
-    const refreshBtn = document.getElementById("refresh-btn");
     const ssidInput = document.getElementById("ssid");
+    const passwordInput = document.getElementById("password");
 
     function fetchNetworks() {
-        list.innerHTML = "<li>Loading networks...</li>";
+        list.innerHTML = '<div class="loading-spinner"></div>';
         fetch("/access-points.json")
             .then(response => {
                 if (!response.ok) throw new Error("Network response was not ok");
@@ -13,33 +13,31 @@ document.addEventListener("DOMContentLoaded", () => {
             .then(data => {
                 list.innerHTML = "";
                 if (data.length === 0) {
-                    list.innerHTML = "<li>No networks found.</li>";
+                    list.innerHTML = "<p>No networks found.</p>";
                     return;
                 }
                 data.forEach(network => {
-                    const li = document.createElement("li");
-                    // We append elements indicating SSID and signal strength
-                    li.textContent = `${network.ssid} (Signal: ${network.rssi} dBm)`;
-                    li.style.cursor = "pointer";
-                    li.title = "Click to select this network";
-                    
-                    // Clicking on a network populates the SSID field
-                    li.addEventListener("click", () => {
+                    const div = document.createElement("div");
+                    div.className = "network-item";
+
+                    div.innerHTML = `
+                        <span class="network-ssid">${network.ssid}</span>
+                        <span class="network-rssi">${network.rssi} dBm</span>
+                    `;
+
+                    div.addEventListener("click", () => {
                         ssidInput.value = network.ssid;
-                        document.getElementById("password").focus();
+                        passwordInput.focus();
                     });
-                    
-                    list.appendChild(li);
+
+                    list.appendChild(div);
                 });
             })
             .catch(error => {
                 console.error("Failed to fetch networks:", error);
-                list.innerHTML = "<li>Error loading networks. Please reload the page.</li>";
+                list.innerHTML = "<p>Error loading networks. Please reload.</p>";
             });
     }
 
-    refreshBtn.addEventListener("click", fetchNetworks);
-    
-    // Initial fetch when the page loads
     fetchNetworks();
 });

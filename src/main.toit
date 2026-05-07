@@ -24,9 +24,14 @@ main:
     network/net.Interface? := null
     exception := catch --trace:
       network = net.open
+      mode.mark_wifi_configured
       run network
       retries = 0
     if network: network.close
+    if exception and mode.is_missing_wifi_configuration_error exception:
+      log.info "wifi is not configured; entering setup mode"
+      mode.clear_wifi_configured
+      mode.run_setup
     sleep PERIOD
 
   // We keep failing to connect or run the app. We assume

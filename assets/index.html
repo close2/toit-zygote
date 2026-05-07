@@ -4,33 +4,46 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WiFi Settings</title>
-  <!-- If included in the assets, we can link additional stylesheets -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Configure WiFi</h1>
-    <p>Please enter the credentials for your WiFi network so the device can connect.</p>
-    
-    <!-- The form must use GET and contain 'ssid' and 'password' inputs -->
-    <form action="/" method="GET">
-      <label for="ssid">Network Name (SSID):</label>
-      <input type="text" id="ssid" name="ssid" required autocorrect="off" autocapitalize="none">
-      
-      <label for="password">Password:</label>
-      <input type="password" id="password" name="password" autocorrect="off" autocapitalize="none">
-      
-      <input type="submit" value="Connect">
-    </form>
-
-    <div class="networks-section">
-      <h2>Available Networks</h2>
-      <p><small>Reload the page to see this list again.</small></p>
-      <!-- The server will replace this tag with the list of access points -->
-      <div class="network-list">
-        {{access-points}}
-      </div>
-    </div>
+  <div class="background-blobs">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
   </div>
+
+  <div class="container">
+    <header class="glass-panel">
+      <h1>WiFi Setup</h1>
+    </header>
+
+    <main class="glass-panel">
+      <p>Configure WiFi for your device.</p>
+
+      <form action="/" method="GET" id="wifi-form">
+        <div class="form-group">
+          <label for="ssid">SSID (Network Name)</label>
+          <input type="text" id="ssid" name="ssid" required autocorrect="off" autocapitalize="none" placeholder="Select a network below or type here">
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" autocorrect="off" autocapitalize="none" placeholder="Enter password">
+        </div>
+
+        <button type="submit" class="primary-btn">Connect</button>
+      </form>
+
+      <div class="networks-section">
+        <h2>Available Networks</h2>
+        <div id="network-list" class="network-list">
+          <div class="loading-spinner"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>

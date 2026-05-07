@@ -21,7 +21,7 @@ main:
   
   // Start the HTTP server in a separate task.
   server_task := task::
-    setup.run_http network access_points --port=8080
+    setup.run_http_ network access_points --port=8080
     
   print "Server started"
   
@@ -42,8 +42,9 @@ main:
   print str
   
   expect_equals 200 response.status_code
-  expect_equals true (str.contains "Update WiFi settings")
+  expect_equals true (str.contains "Configure WiFi")
   expect_equals true (str.contains "MyNetwork")
+  expect_equals true (str.contains "app.js")
   
   client.close
   network.close

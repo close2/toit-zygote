@@ -22,8 +22,8 @@ import .mode as mode
 
 ASSETS ::= assets.decode
 
-CAPTIVE_PORTAL_SSID     ::= "mywifi"
-CAPTIVE_PORTAL_PASSWORD ::= "12345678"
+DEFAULT_SSID_     ::= "mywifi"
+DEFAULT_PASSWORD_ ::= "12345678"
 
 TEMPORARY_REDIRECTS ::= {
   "generate_204": "/",    // Used by Android captive portal detection.
@@ -52,38 +52,57 @@ DEFAULT_INDEX ::= """
 """
 
 main:
+  run_captive_portal_setup
+
+/**
+Runs the captive portal WiFi setup.
+
+Creates a WiFi access point with the given $ssid and $password,
+  serves a captive portal for WiFi credential configuration, and
+  reboots into application mode when done.
+*/
+run_captive_portal_setup --ssid/string=DEFAULT_SSID_ --password/string=DEFAULT_PASSWORD_:
   // We allow the setup container to start and eagerly terminate
   // if we don't need it yet. This makes it possible to have
   // the setup container installed always, but have it run with
   // the -D jag.disabled flag in development.
   if mode.RUNNING: return
 
-  // When running in development we run for less time before we
-  // back to trying out the app. This makes it faster to correct
-  // things and retry, but it does mean that you have less time
-  // to connect to the established WiFi.
-  timeout := mode.DEVELOPMENT ? (Duration --s=30) : (Duration --m=3)
-  catch --unwind=(: it != DEADLINE_EXCEEDED_ERROR): run timeout
+  // Devices that were never configured should stay in setup mode
+  // until credentials are entered successfully. Devices that used
+  // to have WiFi credentials still time out so the main application
+  // can continue its retry loop.
+  timeout/Duration? := null
+  if mode.has_wifi_configuration:
+    // When running in development we run for less time before we
+    // back to trying out the app. This makes it faster to correct
+    // things and retry, but it does mean that you have less time
+    // to connect to the established WiFi.
+    timeout = mode.DEVELOPMENT ? (Duration --s=30) : (Duration --m=3)
+  catch --unwind=(: it != DEADLINE_EXCEEDED_ERROR): run_ timeout --ssid=ssid --password=password
 
   // We're done trying to complete the setup. Go back to running
   // the application and let it choose when to re-initiate the
   // setup process.
   mode.run_application
 
-run timeout/Duration:
+run_ timeout/Duration? --ssid/string --password/string:
   log.info "scanning for wifi access points"
   channels := ByteArray 12: it + 1
   access_points := wifi.scan channels
   access_points.sort --in_place: | a b | b.rssi.compare_to a.rssi
 
-  log.info "establishing wifi in AP mode ($CAPTIVE_PORTAL_SSID)"
+  log.info "establishing wifi in AP mode ($ssid)"
   while true:
     network_ap := wifi.establish
-        --ssid=CAPTIVE_PORTAL_SSID
-        --password=CAPTIVE_PORTAL_PASSWORD
+        --ssid=ssid
+        --password=password
     credentials/Map? := null
     try:
-      with_timeout timeout: credentials = run_captive_portal network_ap access_points
+      if timeout:
+        with_timeout timeout: credentials = run_captive_portal_ network_ap access_points
+      else:
+        credentials = run_captive_portal_ network_ap access_points
     finally:
       network_ap.close
 
@@ -95,18 +114,19 @@ run timeout/Duration:
             --ssid=credentials["ssid"]
             --password=credentials["password"]
         network_sta.close
+        mode.mark_wifi_configured
         log.info "connecting to wifi in STA mode => success" --tags=credentials
         return
       log.warn "connecting to wifi in STA mode => failed" --tags=credentials
 
-run_captive_portal network/net.Interface access_points/List -> Map:
+run_captive_portal_ network/net.Interface access_points/List -> Map:
   results := Task.group --required=1 [
-    :: run_dns network,
-    :: run_http network access_points,
+    :: run_dns_ network,
+    :: run_http_ network access_points,
   ]
   return results[1]  // Return the result from the HTTP server at index 1.
 
-run_dns network/net.Interface -> none:
+run_dns_ network/net.Interface -> none:
   device_ip_address := network.address
   socket := network.udp_open --port=53
   hosts := dns.SimpleDnsServer device_ip_address  // Answer the device IP to all queries.
@@ -120,20 +140,20 @@ run_dns network/net.Interface -> none:
   finally:
     socket.close
 
-run_http network/net.Interface access_points/List --port/int=80 -> Map:
+run_http_ network/net.Interface access_points/List --port/int=80 -> Map:
   socket := network.tcp_listen port
-  server := http.Server
+  server := http.Server --max-tasks=4
   result/Map? := null
   try:
     server.listen socket:: | request writer |
-      result = handle_http_request request writer access_points
+      result = handle_http_request_ request writer access_points
       if result: socket.close
   finally:
     if result: return result
     socket.close
   unreachable
 
-handle_http_request request/http.Request writer/http.ResponseWriter access_points/List -> Map?:
+handle_http_request_ request/http.Request writer/http.ResponseWriter access_points/List -> Map?:
   query := url.QueryString.parse request.path
   resource := query.resource
   if resource == "/": resource = "index.html"
