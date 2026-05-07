@@ -15,10 +15,19 @@ jobs:
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
         toit-version: [ v2.0.0-alpha.190, latest ]
+        # Some toit releases ship without a toit-windows.tar.gz asset.
+        # When that happens we still want CI to succeed; the pinned
+        # windows + v2.0.0-alpha.190 leg gives us real Windows
+        # coverage either way.
+        include:
+          - os: windows-latest
+            toit-version: latest
+            allow-failure: true
 
     name: CI - ${{ matrix.os }} - ${{ matrix.toit-version }}
 
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.allow-failure == true }}
 
     steps:
       - uses: actions/checkout@v5
