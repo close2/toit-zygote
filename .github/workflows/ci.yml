@@ -13,16 +13,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, windows-latest, macos-14 ]
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        toit-version: [ v2.0.0-alpha.143, latest ]
 
-    name: CI - ${{ matrix.os }}
+    name: CI - ${{ matrix.os }} - ${{ matrix.toit-version }}
 
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: toitlang/action-setup@v1
+        with:
+          toit-version: ${{ matrix.toit-version }}
 
       - name: Test
         run: make test
