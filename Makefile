@@ -5,6 +5,9 @@
 CHIP   = esp32
 JAGUAR = $(HOME)/.cache/jaguar
 
+.PHONY: all
+all: test
+
 .PHONY: firmware
 firmware: build/firmware.envelope
 
@@ -12,6 +15,29 @@ firmware: build/firmware.envelope
 clean:
 	rm -rf build
 
+#############################################################################
+# Tests
+#############################################################################
+
+.PHONY: build/CMakeCache.txt
+build/CMakeCache.txt:
+	$(MAKE) rebuild-cmake
+
+.PHONY: install-pkgs
+install-pkgs: rebuild-cmake
+	cmake --build build --target install-pkgs
+
+.PHONY: test
+test: install-pkgs rebuild-cmake
+	cmake --build build --target check
+
+.PHONY: rebuild-cmake
+rebuild-cmake:
+	mkdir -p build
+	cmake -B build -DCMAKE_BUILD_TYPE=Debug
+
+#############################################################################
+# Firmware demo
 #############################################################################
 
 build/firmware.envelope: build/app.snapshot

@@ -3,7 +3,7 @@ import net
 import http
 import encoding.json
 
-import ..src.setup as setup
+import zygote.setup as setup
 
 class MockAccessPoint:
   ssid/string
@@ -25,7 +25,7 @@ main:
 
   // Start the HTTP server in a separate task on a fixed local port.
   server_task := task::
-    setup.run_http_ network access_points --port=8080
+    setup.run_http network access_points --port=8080
 
   // Give the server a moment to start listening.
   sleep --ms=500

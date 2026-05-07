@@ -122,7 +122,7 @@ run_ timeout/Duration? --ssid/string --password/string:
 run_captive_portal_ network/net.Interface access_points/List -> Map:
   results := Task.group --required=1 [
     :: run_dns_ network,
-    :: run_http_ network access_points,
+    :: run_http network access_points,
   ]
   return results[1]  // Return the result from the HTTP server at index 1.
 
@@ -140,7 +140,20 @@ run_dns_ network/net.Interface -> none:
   finally:
     socket.close
 
-run_http_ network/net.Interface access_points/List --port/int=80 -> Map:
+/**
+Runs the captive-portal HTTP server on $network and returns the
+  WiFi credentials submitted by the user.
+
+Listens on the given $port (defaults to 80) and serves either the
+  bundled $DEFAULT_INDEX or the assets injected via `system.assets`.
+  The server keeps running until a successful credential submission
+  arrives, at which point the listening socket is closed and the
+  submitted credentials are returned.
+
+Exposed primarily so tests and advanced callers can drive the HTTP
+  layer without bringing up an actual WiFi access point.
+*/
+run_http network/net.Interface access_points/List --port/int=80 -> Map:
   socket := network.tcp_listen port
   server := http.Server --max-tasks=4
   result/Map? := null

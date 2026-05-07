@@ -19,6 +19,19 @@ main:
   // interfering with each other.
   if not mode.RUNNING: return
 
+  // If the device has never been configured (no firmware-baked
+  // WiFi credentials and no flag in our zygote bucket), hand
+  // control to the setup container immediately. We rely on the
+  // recorded `wifi-configured` flag rather than waiting for
+  // `net.open` to throw, because the SDK's WiFi service can
+  // hang indefinitely when no credentials are available instead
+  // of returning the "wifi ssid not provided" error to the
+  // caller.
+  if not mode.has_wifi_configuration:
+    log.info "wifi has never been configured; entering setup mode"
+    mode.run_setup
+    return
+
   retries := 0
   while ++retries < RETRIES:
     network/net.Interface? := null

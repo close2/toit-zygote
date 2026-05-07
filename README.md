@@ -154,3 +154,72 @@ or flash via a serial connection:
 ```
 jag flash --exclude-jaguar build/firmware.envelope
 ```
+
+# Using Zygote as a package
+
+The setup container and the `mode` helpers can be reused as a
+[Toit package](https://docs.toit.io/language/package). Add the
+package to your project:
+
+``` sh
+toit pkg install github.com/kasperl/toit-zygote
+```
+
+Your setup container can then be as small as:
+
+``` toit
+import zygote.setup show run_captive_portal_setup
+
+main:
+  // Use an empty password to bring up an open access point. The
+  // captive portal is the only thing the user needs to reach in order
+  // to complete provisioning, and shipping a default password that has
+  // to be looked up in the documentation tends to confuse end users.
+  run_captive_portal_setup --ssid="my-device" --password=""
+```
+
+In your application container, drive the retry loop and hand control
+over to the setup container when WiFi keeps failing:
+
+``` toit
+import net
+import zygote.mode as mode
+
+main:
+  if not mode.RUNNING: return
+
+  // Devices that have never been configured (no firmware-baked WiFi
+  // credentials and no recorded `wifi-configured` flag) should hand
+  // control to the setup container immediately. We rely on the
+  // recorded flag rather than waiting for `net.open` to throw,
+  // because the SDK's WiFi service can hang indefinitely when no
+  // credentials are available instead of returning the
+  // "wifi ssid not provided" error to the caller.
+  if not mode.has_wifi_configuration:
+    mode.run_setup
+    return
+
+  retries := 0
+  while ++retries < RETRIES:
+    network/net.Interface? := null
+    exception := catch --trace:
+      network = net.open
+      mode.mark_wifi_configured
+      run network
+      retries = 0
+    if network: network.close
+    if exception and mode.is_missing_wifi_configuration_error exception:
+      mode.clear_wifi_configured
+      mode.run_setup
+    sleep PERIOD
+
+  // Persistently failing means the saved credentials are likely
+  // wrong; reboot into setup mode.
+  mode.run_setup
+```
+
+`mode.run_setup` reboots the device into setup mode, and
+`mode.run_application` does the reverse. `mode.has_wifi_configuration`
+returns true if either the firmware was built with WiFi credentials
+(`wifi.ssid` in the firmware config) or `mode.mark_wifi_configured`
+has been called previously.
