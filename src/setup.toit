@@ -47,8 +47,8 @@ DEFAULT_INDEX ::= """
     </form>
     <p>
     {{access-points}}
-  <body>
-<html>
+  </body>
+</html>
 """
 
 main:
@@ -189,6 +189,8 @@ handle_http_request_ request/http.Request writer/http.ResponseWriter access_poin
       writer.write (str.substitute: substitutions.get it --if_absent=(: "{{$it}}"))
     else:
       writer.write asset
+      // Static assets are not credential submissions; we are done.
+      return null
   else if resource != "index.html":
     writer.headers.set "Content-Type" "text/plain"
     writer.write_headers 404
