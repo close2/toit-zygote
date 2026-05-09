@@ -90,10 +90,10 @@ run_ timeout/Duration? --ssid/string --password/string:
   log.info "scanning for wifi access points"
   channels := ByteArray 12: it + 1
   access_points/List := []
-  exception := catch:
+  scan-exception := catch:
     access_points = wifi.scan channels
     access_points.sort --in_place: | a b | b.rssi.compare_to a.rssi
-  if exception:
+  if scan-exception:
     log.warn "wifi access point scan failed; continuing without scan results"
 
   log.info "establishing wifi in AP mode ($ssid)"
