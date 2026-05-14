@@ -117,8 +117,14 @@ run_ timeout/Duration? --ssid/string --password/string:
             --save
             --ssid=credentials["ssid"]
             --password=credentials["password"]
-        network_sta.close
+        // The --save flag has now persisted the credentials to SDK
+        // storage.  Mark the zygote bucket flag *before* closing the
+        // interface so that even if `network_sta.close` throws, the
+        // device will still know on next boot that the SDK has
+        // credentials worth trying — otherwise the next boot would
+        // re-enter setup mode despite valid credentials being saved.
         mode.mark_wifi_configured
+        network_sta.close
         log.info "connecting to wifi in STA mode => success" --tags=credentials
         return
       log.warn "connecting to wifi in STA mode => failed" --tags=credentials
